@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🚗 Vehicle Data Viewer</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f7f9fc;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #2b7cff;
+      color: white;
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    main {
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 1rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    button {
+      background: #2b7cff;
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-bottom: 1.2rem;
+    }
+    button:hover { background: #185ed6; }
+    .editBtn { background: #f0ad4e; }
+    .editBtn:hover { background: #ec971f; }
+    #status { margin-bottom: 1rem; font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: #f1f5fb; font-weight: 600; }
+    tr:hover { background: #f9fbff; }
+    .error { color: #d9534f; font-weight: 600; }
+    .loading { color: #2b7cff; font-weight: 600; }
+
+    /* Modal Styling */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 350px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+    .modal-content h3 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .modal-content label {
+      display: block;
+      margin-top: 8px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #editPlate {
+      background: #f1f1f1;
+      cursor: not-allowed;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15px;
+    }
+    .closeBtn {
+      background: #d9534f;
+    }
+    .closeBtn:hover {
+      background: #b52b27;
+    }
+    .success-msg {
+      color: green;
+      text-align: center;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>🚘 Vehicle Data Viewer</header>
+
+  <main>
+    <button id="loadBtn">🔄 Load Vehicles</button>
+    <div id="status"></div>
+    <table id="vehicleTable">
+      <thead>
+        <tr>
+          <th>S.No</th>
+          <th>Plate Number</th>
+          <th>Make</th>
+          <th>Model</th>
+          <th>Ownership</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal" id="editModal">
+    <div class="modal-content">
+      <h3>Edit Vehicle</h3>
+      <label>Plate Number</label>
+      <input type="text" id="editPlate" readonly />
+
+      <label>Make</label>
+      <input type="text" id="editMake" />
+
+      <label>Model</label>
+      <input type="text" id="editModel" />
+
+      <label>Ownership</label>
+      <input type="text" id="editOwnership" />
+
+      <label>From</label>
+      <input type="text" id="editFrom" />
+
+      <label>To</label>
+      <input type="text" id="editTo" />
+
+      <div class="modal-actions">
+        <button class="closeBtn" id="closeModal">❌ Cancel</button>
+        <button id="saveChanges">💾 Save</button>
+      </div>
+      <div class="success-msg" id="modalSuccess"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "https://test-node-js-4.onrender.com";
+    const loadBtn = document.getElementById("loadBtn");
+    const status = document.getElementById("status");
+    const tableBody = document.querySelector("#vehicleTable tbody");
+
+    const editModal = document.getElementById("editModal");
+    const closeModal = document.getElementById("closeModal");
+    const saveChanges = document.getElementById("saveChanges");
+
+    const editPlate = document.getElementById("editPlate");
+    const editMake = document.getElementById("editMake");
+    const editModel = document.getElementById("editModel");
+    const editOwnership = document.getElementById("editOwnership");
+    const editFrom = document.getElementById("editFrom");
+    const editTo = document.getElementById("editTo");
+    const modalSuccess = document.getElementById("modalSuccess");
+
+    let selectedRow = null;
+
+    // 🧭 Load vehicle list
+    loadBtn.addEventListener("click", async () => {
+      status.textContent = "⏳ Loading...";
+      status.className = "loading";
+      tableBody.innerHTML = "";
+
+      try {
+        const response = await fetch(`${API_BASE}/getVehicles`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        if (!data.vehicles || data.vehicles.length === 0) {
+          status.textContent = "⚠️ No vehicles found.";
+          status.className = "";
+          return;
+        }
+
+        data.vehicles.forEach((vehicle, index) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${vehicle.plateNumber || "-"}</td>
+            <td>${vehicle.make || ""}</td>
+            <td>${vehicle.model || ""}</td>
+            <td>${vehicle.ownershipType || ""}</td>
+            <td>${vehicle.from || ""}</td>
+            <td>${vehicle.to || ""}</td>
+            <td><button class="editBtn">✏️ Edit</button></td>
+          `;
+
+          const editBtn = row.querySelector(".editBtn");
+          editBtn.addEventListener("click", () => {
+            selectedRow = row;
+            editPlate.value = vehicle.plateNumber || "";
+            editMake.value = vehicle.make || "";
+            editModel.value = vehicle.model || "";
+            editOwnership.value = vehicle.ownershipType || "";
+            editFrom.value = vehicle.from || "";
+            editTo.value = vehicle.to || "";
+            modalSuccess.textContent = "";
+            editModal.style.display = "flex";
+          });
+
+          tableBody.appendChild(row);
+        });
+
+        status.textContent = `✅ Loaded ${data.total} vehicles`;
+        status.className = "";
+      } catch (err) {
+        console.error(err);
+        status.textContent = `❌ Error: ${err.message}`;
+        status.className = "error";
+      }
+    });
+
+    closeModal.addEventListener("click", () => {
+      editModal.style.display = "none";
+    });
+
+    saveChanges.addEventListener("click", async () => {
+      const plateNumber = editPlate.value.trim();
+      const updatedData = {
+        make: editMake.value.trim(),
+        model: editModel.value.trim(),
+        ownershipType: editOwnership.value.trim(),
+        from: editFrom.value.trim(),
+        to: editTo.value.trim(),
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/updateVehicle/${encodeURIComponent(plateNumber)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedData),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = await res.json();
+
+        // update table row values (skip S.No & plate number)
+        selectedRow.cells[2].innerText = updatedData.make;
+        selectedRow.cells[3].innerText = updatedData.model;
+        selectedRow.cells[4].innerText = updatedData.ownershipType;
+        selectedRow.cells[5].innerText = updatedData.from;
+        selectedRow.cells[6].innerText = updatedData.to;
+
+        modalSuccess.textContent = "✅ Updated successfully!";
+        modalSuccess.style.color = "green";
+        setTimeout(() => {
+          editModal.style.display = "none";
+        }, 1500);
+      } catch (err) {
+        modalSuccess.style.color = "red";
+        modalSuccess.textContent = "❌ Failed to update: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
