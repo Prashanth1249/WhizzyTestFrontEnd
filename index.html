@@ -107,6 +107,23 @@
       font-weight: 600;
       margin-top: 10px;
     }
+
+    /* 🌀 Spinner */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #ccc;
+      border-top: 2px solid #2b7cff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -136,28 +153,33 @@
   <div class="modal" id="editModal">
     <div class="modal-content">
       <h3>Edit Vehicle</h3>
-      <label>Plate Number</label>
-      <input type="text" id="editPlate" readonly />
 
-      <label>Make</label>
-      <input type="text" id="editMake" />
+      <!-- form container -->
+      <div id="editFormContainer">
+        <label>Plate Number</label>
+        <input type="text" id="editPlate" readonly />
 
-      <label>Model</label>
-      <input type="text" id="editModel" />
+        <label>Make</label>
+        <input type="text" id="editMake" />
 
-      <label>Ownership</label>
-      <input type="text" id="editOwnership" />
+        <label>Model</label>
+        <input type="text" id="editModel" />
 
-      <label>From</label>
-      <input type="text" id="editFrom" />
+        <label>Ownership</label>
+        <input type="text" id="editOwnership" />
 
-      <label>To</label>
-      <input type="text" id="editTo" />
+        <label>From</label>
+        <input type="text" id="editFrom" />
 
-      <div class="modal-actions">
-        <button class="closeBtn" id="closeModal">Cancel</button>
-        <button id="saveChanges">Save</button>
+        <label>To</label>
+        <input type="text" id="editTo" />
+
+        <div class="modal-actions">
+          <button class="closeBtn" id="closeModal">Cancel</button>
+          <button id="saveChanges">Save</button>
+        </div>
       </div>
+
       <div class="success-msg" id="modalSuccess"></div>
     </div>
   </div>
@@ -171,6 +193,7 @@
     const editModal = document.getElementById("editModal");
     const closeModal = document.getElementById("closeModal");
     const saveChanges = document.getElementById("saveChanges");
+    const editFormContainer = document.getElementById("editFormContainer");
 
     const editPlate = document.getElementById("editPlate");
     const editMake = document.getElementById("editMake");
@@ -222,6 +245,7 @@
             editFrom.value = vehicle.from || "";
             editTo.value = vehicle.to || "";
             modalSuccess.textContent = "";
+            editFormContainer.style.display = "block";
             editModal.style.display = "flex";
           });
 
@@ -251,6 +275,11 @@
         to: editTo.value.trim(),
       };
 
+      // Hide form & show spinner
+      editFormContainer.style.display = "none";
+      modalSuccess.innerHTML = `<div class="spinner"></div> Updating...`;
+      modalSuccess.style.color = "#000";
+
       try {
         const res = await fetch(`${API_BASE}/updateVehicle/${encodeURIComponent(plateNumber)}`, {
           method: "PUT",
@@ -261,21 +290,25 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = await res.json();
 
-        // update table row values (skip S.No & plate number)
+        // ✅ Update table row values
         selectedRow.cells[2].innerText = updatedData.make;
         selectedRow.cells[3].innerText = updatedData.model;
         selectedRow.cells[4].innerText = updatedData.ownershipType;
         selectedRow.cells[5].innerText = updatedData.from;
         selectedRow.cells[6].innerText = updatedData.to;
 
-        modalSuccess.textContent = "✅ Updated successfully!";
+        modalSuccess.innerHTML = "✅ Updated successfully!";
         modalSuccess.style.color = "green";
+
         setTimeout(() => {
           editModal.style.display = "none";
-        }, 1500);
+          modalSuccess.innerHTML = "";
+          editFormContainer.style.display = "block";
+        }, 1200);
       } catch (err) {
         modalSuccess.style.color = "red";
-        modalSuccess.textContent = "❌ Failed to update: " + err.message;
+        modalSuccess.innerHTML = `❌ Failed to update: ${err.message}`;
+        editFormContainer.style.display = "block";
       }
     });
   </script>
